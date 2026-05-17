@@ -1,0 +1,9 @@
+# Netlify 发布配置：网站根目录为 html 文件夹
+[build]
+  publish = "html"
+
+# 单页应用式路由（本项目为静态页，一般不需要）
+# [[redirects]]
+#   from = "/*"
+#   to = "/index.html"
+#   status = 200

@@ -1,0 +1,12 @@
+{
+  "name": "shiguang-server",
+  "version": "1.0.0",
+  "description": "拾光日记可选后端",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}
