@@ -48,7 +48,7 @@
 <div id="app" class="phone-shell hidden">
   <header class="header safe-top">
     <button type="button" class="icon-round" id="btn-menu" aria-label="设置"></button>
-    <span class="header-title">拾光</span>
+    <span class="header-title" id="header-title">拾光</span>
     <button type="button" class="icon-round" id="btn-dark" aria-label="深色模式"></button>
   </header>
   <main class="main-scroll" id="main-content"></main>
@@ -62,7 +62,7 @@
 <div id="sidebar" class="sidebar-mask hidden">
   <aside class="sidebar-panel safe-top safe-bottom" id="sidebar-panel">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-      <span class="sidebar-title">设置中心</span>
+      <span class="sidebar-title">设置</span>
       <button type="button" class="icon-round" id="btn-sidebar-close" aria-label="关闭"></button>
     </div>
     <p class="sidebar-section">个性化皮肤</p>
@@ -87,7 +87,6 @@
     </div>
     <p class="sidebar-section">数据管理</p>
     <p class="sidebar-hint">数据按本设备保存，升级功能后旧日记会自动保留。建议偶尔「导出备份」。</p>
-    <p class="sidebar-hint">同一网址下多窗口共享。设备 ID 见下方。</p>
     <p class="sidebar-hint" id="device-id-hint" style="font-size:0.6rem;word-break:break-all"></p>
     <button type="button" class="sidebar-btn sidebar-btn-with-icon" id="btn-export"></button>
     <button type="button" class="sidebar-btn sidebar-btn-with-icon" id="btn-import"></button>

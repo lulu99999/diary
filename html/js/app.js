@@ -21,7 +21,8 @@
     mood: 'happy',
     images: [],
     editingId: null,
-    passInput: ''
+    passInput: '',
+    statsPeriod: 'month'
   };
 
   const $ = (id) => document.getElementById(id);
@@ -29,6 +30,8 @@
 
   let viewerImages = [];
   let viewerIndex = 0;
+  let datePickerDraft = null;
+  let yearPickerForDate = false;
 
   function toast(msg, err) {
     const el = $('toast');
@@ -54,6 +57,16 @@
 
   function monthEntries() {
     return API.filterByMonth(state.entries, state.year, state.month);
+  }
+
+  function yearEntries() {
+    return API.filterByYear(state.entries, state.year);
+  }
+
+  function statsEntries() {
+    return state.statsPeriod === 'year'
+      ? yearEntries()
+      : monthEntries();
   }
 
   function findEntry(id) {
@@ -168,8 +181,21 @@
     });
   }
 
+  function syncHeaderTitle() {
+    const el = $('header-title');
+    if (!el) return;
+    if (state.view === 'write') {
+      el.textContent = state.editingId ? '编辑日记' : '新建日记';
+    } else if (state.view === 'mood_stats') {
+      el.textContent = '情绪统计';
+    } else {
+      el.textContent = '拾光';
+    }
+  }
+
   function render() {
     applyTheme();
+    syncHeaderTitle();
     const main = $('main-content');
     const bottom = $('bottom-nav');
     const showBottom = ['calendar', 'list', 'mood_stats'].includes(state.view);
@@ -192,7 +218,7 @@
       main.innerHTML = UI.renderWrite(state, API);
       bindWrite();
     } else if (state.view === 'mood_stats') {
-      main.innerHTML = UI.renderStats(month, state);
+      main.innerHTML = UI.renderStats(statsEntries(), state, API);
     }
     bindMainEvents();
   }
@@ -228,6 +254,84 @@
       };
     });
     bindViewableImages(main);
+    bindEntrySwipe(main);
+  }
+
+  function openEntrySwipe(wrap) {
+    if (!wrap) return;
+    const track = wrap.querySelector('.entry-swipe-track');
+    const actions = wrap.querySelector('.entry-swipe-actions');
+    if (!track || !actions) return;
+    closeAllEntrySwipes(wrap);
+    track.scrollTo({ left: track.scrollWidth, behavior: 'smooth' });
+    wrap.classList.add('open');
+  }
+
+  function closeEntrySwipe(wrap) {
+    if (!wrap) return;
+    const track = wrap.querySelector('.entry-swipe-track');
+    wrap.classList.remove('open');
+    if (track) track.scrollTo({ left: 0, behavior: 'smooth' });
+  }
+
+  function closeAllEntrySwipes(except) {
+    document.querySelectorAll('.entry-swipe.open').forEach((el) => {
+      if (el !== except) closeEntrySwipe(el);
+    });
+  }
+
+  function bindEntrySwipe(root) {
+    if (!root) return;
+    root.querySelectorAll('.entry-swipe').forEach((wrap) => {
+      const track = wrap.querySelector('.entry-swipe-track');
+      const actions = wrap.querySelector('.entry-swipe-actions');
+      if (!track || !actions) return;
+      if (track._swipeBound) return;
+      track._swipeBound = true;
+
+      let scrollTimer = null;
+
+      function actionWidth() {
+        return actions.offsetWidth || 132;
+      }
+
+      function isOpen() {
+        return track.scrollLeft > actionWidth() * 0.25;
+      }
+
+      track.addEventListener('scroll', () => {
+        clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(() => {
+          const open = isOpen();
+          wrap.classList.toggle('open', open);
+          if (open) closeAllEntrySwipes(wrap);
+        }, 60);
+      }, { passive: true });
+
+      const body = wrap.querySelector('.entry-card-body');
+      if (body && !body._tapBound) {
+        body._tapBound = true;
+        body.onclick = (ev) => {
+          if (ev.target.closest('button, a')) return;
+          ev.stopPropagation();
+          if (wrap.classList.contains('open')) closeEntrySwipe(wrap);
+          else openEntrySwipe(wrap);
+        };
+      }
+    });
+  }
+
+  if (!bindEntrySwipe._docBound) {
+    bindEntrySwipe._docBound = true;
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('.swipe-btn')) return;
+      const wrap = e.target.closest('.entry-swipe');
+      if (wrap && wrap.classList.contains('open') && e.target.closest('.entry-swipe-main')) {
+        closeEntrySwipe(wrap);
+        return;
+      }
+      if (!e.target.closest('.entry-swipe')) closeAllEntrySwipes();
+    });
   }
 
   function openImageViewer(images, startIndex) {
@@ -324,8 +428,17 @@
     switch (action) {
       case 'month-prev': changeMonth(-1); break;
       case 'month-next': changeMonth(1); break;
+      case 'stats-prev': statsStep(-1); break;
+      case 'stats-next': statsStep(1); break;
+      case 'stats-period-month': setStatsPeriod('month'); break;
+      case 'stats-period-year': setStatsPeriod('year'); break;
       case 'open-year-picker': openYearPicker(); break;
       case 'close-year-picker': closeYearPicker(); break;
+      case 'open-write-date-picker': openWriteDatePicker(); break;
+      case 'close-write-date-picker': closeWriteDatePicker(); break;
+      case 'picker-month-prev': pickerChangeMonth(-1); break;
+      case 'picker-month-next': pickerChangeMonth(1); break;
+      case 'picker-open-year': openYearPicker(true); break;
       case 'open-photo-sheet': openPhotoSheet(); break;
       case 'close-photo-sheet': closePhotoSheet(); break;
       case 'cancel-write': setView('calendar'); break;
@@ -336,16 +449,85 @@
     }
   }
 
-  function openYearPicker() {
+  function updateWriteDateDisplay() {
+    const el = document.querySelector('.write-date-display');
+    if (el) el.textContent = UI.formatWriteDate(state.year, state.month, state.activeDay);
+  }
+
+  function openWriteDatePicker() {
+    datePickerDraft = { year: state.year, month: state.month, day: state.activeDay };
+    refreshWriteDatePicker();
+  }
+
+  function refreshWriteDatePicker() {
+    if (!datePickerDraft) return;
     const root = $('year-picker-root');
-    root.innerHTML = UI.renderYearPicker(state.year);
+    root.innerHTML = UI.renderWriteDatePicker(datePickerDraft, API);
+    root.classList.remove('hidden');
+    root.querySelector('#write-date-picker-mask').onclick = (e) => {
+      if (e.target.id === 'write-date-picker-mask') closeWriteDatePicker();
+    };
+    root.querySelector('[data-action="close-write-date-picker"]').onclick = closeWriteDatePicker;
+    root.querySelectorAll('[data-picker-day]').forEach((btn) => {
+      btn.onclick = () => {
+        state.year = datePickerDraft.year;
+        state.month = datePickerDraft.month;
+        state.activeDay = parseInt(btn.dataset.pickerDay, 10);
+        closeWriteDatePicker();
+        updateWriteDateDisplay();
+      };
+    });
+    root.querySelectorAll('[data-action]').forEach((el) => {
+      const a = el.dataset.action;
+      if (a === 'close-write-date-picker' || a === 'picker-open-year') return;
+      el.onclick = () => handleAction(a);
+    });
+    const yearBtn = root.querySelector('[data-action="picker-open-year"]');
+    if (yearBtn) yearBtn.onclick = () => openYearPicker(true);
+  }
+
+  function closeWriteDatePicker() {
+    datePickerDraft = null;
+    const root = $('year-picker-root');
+    if (!yearPickerForDate) {
+      root.innerHTML = '';
+      root.classList.add('hidden');
+    }
+  }
+
+  function pickerChangeMonth(d) {
+    if (!datePickerDraft) return;
+    let m = datePickerDraft.month + d;
+    let y = datePickerDraft.year;
+    if (m < 0) { m = 11; y--; }
+    if (m > 11) { m = 0; y++; }
+    datePickerDraft.month = m;
+    datePickerDraft.year = y;
+    const max = API.daysInMonth(y, m);
+    if (datePickerDraft.day > max) datePickerDraft.day = max;
+    refreshWriteDatePicker();
+  }
+
+  function openYearPicker(fromDatePicker) {
+    yearPickerForDate = !!fromDatePicker;
+    const year = fromDatePicker && datePickerDraft ? datePickerDraft.year : state.year;
+    const root = $('year-picker-root');
+    root.innerHTML = UI.renderYearPicker(year);
     root.classList.remove('hidden');
     root.querySelector('#year-picker-mask').onclick = (e) => {
       if (e.target.id === 'year-picker-mask') closeYearPicker();
     };
     root.querySelectorAll('[data-year]').forEach((btn) => {
       btn.onclick = () => {
-        state.year = parseInt(btn.dataset.year, 10);
+        const y = parseInt(btn.dataset.year, 10);
+        if (yearPickerForDate && datePickerDraft) {
+          datePickerDraft.year = y;
+          const max = API.daysInMonth(y, datePickerDraft.month);
+          if (datePickerDraft.day > max) datePickerDraft.day = max;
+          closeYearPicker();
+          return;
+        }
+        state.year = y;
         clampActiveDay();
         closeYearPicker();
         render();
@@ -355,6 +537,12 @@
   }
 
   function closeYearPicker() {
+    const returnToDate = yearPickerForDate && datePickerDraft;
+    yearPickerForDate = false;
+    if (returnToDate) {
+      refreshWriteDatePicker();
+      return;
+    }
     const root = $('year-picker-root');
     root.innerHTML = '';
     root.classList.add('hidden');
@@ -383,6 +571,23 @@
     state.month = m;
     state.year = y;
     clampActiveDay();
+    render();
+  }
+
+  function changeYear(d) {
+    state.year += d;
+    clampActiveDay();
+    render();
+  }
+
+  function statsStep(d) {
+    if (state.statsPeriod === 'year') changeYear(d);
+    else changeMonth(d);
+  }
+
+  function setStatsPeriod(period) {
+    if (state.statsPeriod === period) return;
+    state.statsPeriod = period;
     render();
   }
 

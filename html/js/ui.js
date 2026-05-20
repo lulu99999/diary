@@ -142,20 +142,30 @@
         ? (imgs.length === 1 ? renderImagesBlock(imgs, 'cover') : renderImagesBlock(imgs, 'scroll'))
         : '';
       return (
+        '<div class="entry-swipe" data-entry-id="' + e.id + '">' +
+        '<div class="entry-swipe-track">' +
+        '<div class="entry-swipe-main">' +
         '<div class="entry-card">' + imgHtml +
         '<div class="entry-card-body">' +
-        '<div class="entry-card-head">' +
-        '<div class="entry-meta"><span class="date">' + esc(e.date) + '</span> ' +
-        '<span>' + esc(e.time) + ' · ' + m.label + '</span></div>' +
-        '<div class="entry-actions">' +
-        '<button type="button" class="icon-btn" data-edit="' + e.id + '" title="编辑">' + ico('pencil', 14) + '</button>' +
-        '<button type="button" class="icon-btn danger" data-delete="' + e.id + '" title="删除">' + ico('trash', 14) + '</button>' +
-        '</div></div>' +
+        '<div class="entry-card-row">' +
+        '<span class="entry-mood-ico">' + moodIco(e.mood, 24, false) + '</span>' +
+        '<div class="entry-card-col">' +
+        '<div class="entry-card-meta">' +
+        '<span class="entry-date">' + esc(e.date) + '</span>' +
+        '<span class="entry-meta-dot">·</span>' +
+        '<span class="entry-sub">' + esc(e.time) + ' · ' + m.label + '</span>' +
+        '</div>' +
         '<p class="entry-content">' + esc(e.content) + '</p>' +
-        '</div></div>'
+        '</div></div></div></div>' +
+        '</div>' +
+        '<div class="entry-swipe-actions">' +
+        '<button type="button" class="swipe-btn swipe-edit" data-edit="' + e.id + '" aria-label="编辑">' +
+        ico('pencil', 20) + '<span class="swipe-label">编辑</span></button>' +
+        '<button type="button" class="swipe-btn swipe-delete" data-delete="' + e.id + '" aria-label="删除">' +
+        ico('trash', 20) + '<span class="swipe-label">删除</span></button>' +
+        '</div></div></div>'
       );
     },
-
     renderPhotoSection(images, max) {
       max = max || 9;
       const thumbs = (images || []).map((src, i) =>
@@ -180,50 +190,101 @@
       );
     },
 
+    formatWriteDate(year, month, day) {
+      return year + '年' + (month + 1) + '月' + day + '日';
+    },
+
+    renderWriteDatePicker(draft, API) {
+      const total = API.daysInMonth(draft.year, draft.month);
+      const start = API.firstWeekday(draft.year, draft.month);
+      const wd = ['日', '一', '二', '三', '四', '五', '六'];
+      let cells = wd.map((d) => '<div class="cal-wd">' + d + '</div>').join('');
+      for (let i = 0; i < start; i++) cells += '<div></div>';
+      for (let d = 1; d <= total; d++) {
+        const active = draft.day === d;
+        cells +=
+          '<button type="button" class="cal-day picker-day' + (active ? ' active' : '') + '" data-picker-day="' + d + '">' +
+          '<div class="cal-num">' + d + '</div></button>';
+      }
+      return (
+        '<div class="sheet-mask center" id="write-date-picker-mask">' +
+        '<div class="sheet-panel rounded date-picker-panel">' +
+        '<p class="sheet-title">选择日期</p>' +
+        '<div class="date-nav date-picker-nav">' +
+        '<div class="date-nav-group month-nav">' +
+        '<button type="button" class="date-nav-btn" data-action="picker-month-prev" aria-label="上个月">' + ico('chevronLeft', 18) + '</button>' +
+        '<button type="button" class="month-year-btn" data-action="picker-open-year">' +
+        draft.year + '年' + (draft.month + 1) + '月' +
+        '</button>' +
+        '<button type="button" class="date-nav-btn" data-action="picker-month-next" aria-label="下个月">' + ico('chevronRight', 18) + '</button>' +
+        '</div></div>' +
+        '<div class="calendar-grid date-picker-grid">' + cells + '</div>' +
+        '<button type="button" class="sheet-btn cancel" data-action="close-write-date-picker">取消</button>' +
+        '</div></div>'
+      );
+    },
+
     renderWrite(state, API) {
       const moods = Object.keys(MOODS).map((k) => {
         const v = MOODS[k];
         return '<button type="button" class="mood-btn' + (state.mood === k ? ' active' : '') + '" data-mood="' + k + '">' + moodIco(k, 28, false) + '</button>';
       }).join('');
+      const dateLabel = this.formatWriteDate(state.year, state.month, state.activeDay);
       return (
         '<div class="animate-in">' +
         '<div class="write-header">' +
         '<button type="button" data-action="cancel-write" aria-label="关闭">' + ico('x', 20) + '</button>' +
-        '<div style="text-align:center">' +
-        '<div style="font-size:0.85rem;font-weight:800">' + state.year + '/' + (state.month + 1) + '/' + state.activeDay + '</div>' +
-        '<p style="font-size:0.65rem;opacity:0.5">' + (state.editingId ? '编辑' : '新建') + '日记</p></div>' +
+        '<div class="write-header-center">' +
+        '<button type="button" class="write-date-btn" data-action="open-write-date-picker" aria-label="选择日期">' +
+        '<span class="write-date-display">' + dateLabel + '</span>' +
+        ico('calendar', 14) +
+        '</button></div>' +
         '<button type="button" class="btn-save" data-action="save-diary" aria-label="保存">' + ico('check', 18) + '<span>保存</span></button></div>' +
         '<div class="mood-row">' + moods + '</div>' +
-        this.renderPhotoSection(state.images, API.MAX_IMAGES) +
         '<textarea class="write-textarea" id="content-input" placeholder="此刻，你想留下什么...">' + esc(state.draftContent) + '</textarea>' +
-        '<p class="char-count"><span id="char-count">0</span> / 5000 字</p></div>'
+        '<p class="char-count"><span id="char-count">0</span> / 5000 字</p>' +
+        this.renderPhotoSection(state.images, API.MAX_IMAGES) +
+        '</div>'
       );
     },
 
-    renderStats(monthEntries, state) {
-      const total = monthEntries.length;
-      if (total === 0) {
-        return (
-          '<div class="animate-in">' +
-          '<div class="write-header" style="margin-bottom:20px">' +
-          '<button type="button" class="icon-round" data-view="calendar" aria-label="返回">' + ico('chevronLeft', 20) + '</button>' +
-          '<h2 style="font-size:1.1rem;font-weight:800">情绪统计</h2><span></span></div>' +
-          '<div class="empty-state-large">' +
-          '<div class="ico-empty">' + ico('inbox', 48) + '</div>' +
-          '<h3>这里空空如也</h3>' +
-          '<p>' + (state.month + 1) + ' 月还没有心情记录。<br>不是加载失败哦～去写一篇日记吧。</p>' +
-          '</div>' +
-          '<div class="insight-box"><h4>' + ico('lightbulb', 16) + '小提示</h4>' +
-          '<p>写下第一篇日记后，这里会显示你的心情柱状图。</p></div></div>'
-        );
-      }
+    renderStatsNav(state) {
+      const isYear = state.statsPeriod === 'year';
+      const centerLabel = isYear
+        ? state.year + '年'
+        : state.year + '年' + (state.month + 1) + '月';
+      return (
+        '<div class="stats-toolbar animate-in">' +
+        '<div class="stats-scope-tabs view-tabs">' +
+        '<button type="button" class="view-tab stats-scope-tab' + (!isYear ? ' active' : '') + '" data-action="stats-period-month">按月</button>' +
+        '<button type="button" class="view-tab stats-scope-tab' + (isYear ? ' active' : '') + '" data-action="stats-period-year">按年</button>' +
+        '</div>' +
+        '<div class="date-nav stats-date-nav">' +
+        '<div class="date-nav-group month-nav">' +
+        '<button type="button" class="date-nav-btn" data-action="stats-prev" aria-label="' + (isYear ? '上一年' : '上个月') + '">' + ico('chevronLeft', 18) + '</button>' +
+        '<button type="button" class="month-year-btn" data-action="open-year-picker">' + centerLabel + '</button>' +
+        '<button type="button" class="date-nav-btn" data-action="stats-next" aria-label="' + (isYear ? '下一年' : '下个月') + '">' + ico('chevronRight', 18) + '</button>' +
+        '</div></div></div>'
+      );
+    },
 
+    statsPeriodLabel(state) {
+      return state.statsPeriod === 'year'
+        ? state.year + ' 年'
+        : state.year + ' 年 ' + (state.month + 1) + ' 月';
+    },
+
+    computeMoodStats(entries) {
       const stats = { super: 0, happy: 0, meh: 0, sad: 0, angry: 0 };
-      monthEntries.forEach((e) => {
+      entries.forEach((e) => {
         if (stats[e.mood] !== undefined) stats[e.mood]++;
       });
+      return stats;
+    },
+
+    renderMoodBars(stats) {
       const maxVal = Math.max(...Object.values(stats), 1);
-      const bars = Object.keys(MOODS).map((k) => {
+      return Object.keys(MOODS).map((k) => {
         const c = stats[k] || 0;
         const h = Math.max((c / maxVal) * 100, 8);
         return (
@@ -234,15 +295,52 @@
           '</div><span class="ico-mood">' + moodIco(k, 22, false) + '</span></div>'
         );
       }).join('');
+    },
+
+    renderStatsInsight(entries, state, API) {
+      const total = entries.length;
+      const period = this.statsPeriodLabel(state);
       const tip = total > 10 ? '你是一个热爱记录生活的人。' : '多给自己一点时间来记录吧。';
+      if (state.statsPeriod === 'year') {
+        const months = new Set(entries.map((e) => API.parseDate(e.date).month));
+        const activeMonths = months.size;
+        return (
+          '<p>你在 <strong>' + period + '</strong> 共留下了 <strong>' + total + '</strong> 条心情' +
+          (activeMonths ? '，分布在 <strong>' + activeMonths + '</strong> 个月里。' : '。') +
+          tip + '</p>'
+        );
+      }
       return (
-        '<div class="animate-in">' +
-        '<div class="write-header" style="margin-bottom:20px">' +
-        '<button type="button" class="icon-round" data-view="calendar" aria-label="返回">' + ico('chevronLeft', 20) + '</button>' +
-        '<h2 style="font-size:1.1rem;font-weight:800">' + state.year + '年' + (state.month + 1) + '月 统计</h2><span></span></div>' +
+        '<p>你在 <strong>' + period + '</strong> 共留下了 <strong>' + total + '</strong> 条心情。' + tip + '</p>'
+      );
+    },
+
+    renderStats(entries, state, API) {
+      const nav = this.renderStatsNav(state);
+      const period = this.statsPeriodLabel(state);
+
+      if (!entries.length) {
+        const emptyHint = state.statsPeriod === 'year'
+          ? period + ' 还没有心情记录。<br>去写一篇日记吧。'
+          : (state.month + 1) + ' 月还没有心情记录。<br>去写一篇日记吧。';
+        return (
+          '<div class="animate-in stats-page">' + nav +
+          '<div class="empty-state-large">' +
+          '<div class="ico-empty">' + ico('inbox', 48) + '</div>' +
+          '<h3>这里空空如也</h3>' +
+          '<p>' + emptyHint + '</p></div>' +
+          '<div class="insight-box"><h4>' + ico('lightbulb', 16) + '小提示</h4>' +
+          '<p>切换上方月份或年份查看其他时段；写下日记后这里会显示心情柱状图。</p></div></div>'
+        );
+      }
+
+      const bars = this.renderMoodBars(this.computeMoodStats(entries));
+      return (
+        '<div class="animate-in stats-page">' + nav +
         '<div class="stats-bars">' + bars + '</div>' +
         '<div class="insight-box"><h4>' + ico('trending', 16) + '时光洞察</h4>' +
-        '<p>你在 ' + (state.month + 1) + ' 月共留下了 <strong>' + total + '</strong> 条心情。' + tip + '</p></div></div>'
+        this.renderStatsInsight(entries, state, API) +
+        '</div></div>'
       );
     },
 

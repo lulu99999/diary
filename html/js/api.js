@@ -38,6 +38,10 @@
     });
   }
 
+  function filterByYear(entries, year) {
+    return entries.filter((e) => parseDate(e.date).year === year);
+  }
+
   function groupByDay(entries) {
     const map = {};
     entries.forEach((e) => {
@@ -215,6 +219,7 @@
     normalizeEntry,
     getImages,
     filterByMonth,
+    filterByYear,
     groupByDay,
     validateContent,
     validateImages,
