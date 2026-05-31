@@ -60,6 +60,12 @@
         show.map((src) => '<img src="' + imgSrc(src) + '" alt="" />').join('') +
         more + '</div>';
     }
+    if (mode === 'single') {
+      return (
+        '<div class="entry-card-single-img">' +
+        '<img src="' + imgSrc(list[0]) + '" alt="" loading="lazy" /></div>'
+      );
+    }
     return '<img class="cover" src="' + imgSrc(list[0]) + '" alt="" />';
   }
 
@@ -69,9 +75,11 @@
     imgSrc,
     renderImagesBlock,
 
-    renderDateNav(state) {
+    renderDateNav(state, opts) {
+      opts = opts || {};
+      const floating = !!opts.floating;
       return (
-        '<div class="date-nav animate-in">' +
+        '<div class="date-nav animate-in' + (floating ? ' date-nav--float' : ' date-nav--inline') + '">' +
         '<div class="date-nav-group month-nav">' +
         '<button type="button" class="date-nav-btn" data-action="month-prev" aria-label="上个月">' + ico('chevronLeft', 18) + '</button>' +
         '<button type="button" class="month-year-btn" data-action="open-year-picker">' +
@@ -118,34 +126,58 @@
       return (
         '<div class="entry-mini" data-id="' + e.id + '">' +
         '<span class="entry-mood-ico">' + moodIco(e.mood, 22, false) + '</span>' +
-        '<div class="entry-mini-text"><p>' + esc(e.content) + '</p><span>' + esc(e.time) + '</span></div>' +
+        '<div class="entry-mini-text"><p>' + esc(e.content) + '</p><span>' + esc(API.displayTime24(e.time)) + '</span></div>' +
         (imgs.length ? renderImagesBlock(imgs, 'mini') : '') +
         '</div>'
       );
     },
 
-    renderList(monthEntries, API) {
-      const sorted = monthEntries.slice().sort((a, b) => {
+    renderList(allEntries, API) {
+      const sorted = (allEntries || []).slice().sort((a, b) => {
         if (a.date !== b.date) return b.date.localeCompare(a.date);
         return (b.id || 0) - (a.id || 0);
       });
       if (!sorted.length) {
-        return '<p class="empty-hint">本月还没有日记，点下方 + 开始记录</p>';
+        return '<p class="empty-hint">还没有日记，点下方 + 开始记录</p>';
       }
-      return sorted.map((e) => this.renderEntryCard(e, API)).join('');
+      const sections = [];
+      let monthKey = '';
+      sorted.forEach((e) => {
+        const key = (e.date || '').slice(0, 7);
+        if (key !== monthKey) {
+          monthKey = key;
+          const parts = key.split('-').map(Number);
+          const label = parts[0] + '年' + parts[1] + '月';
+          sections.push({ key, label, entries: [] });
+        }
+        sections[sections.length - 1].entries.push(e);
+      });
+      return (
+        '<div class="list-feed">' +
+        sections.map((sec) =>
+          '<section class="list-month-section" data-month-key="' + sec.key + '">' +
+          '<p class="list-month-label">' + sec.label + '</p>' +
+          '<div class="list-month-entries">' +
+          sec.entries.map((e) => this.renderEntryCard(e, API)).join('') +
+          '</div></section>'
+        ).join('') +
+        '</div>'
+      );
     },
 
     renderEntryCard(e, API) {
       const m = MOODS[e.mood] || MOODS.happy;
       const imgs = API.getImages(e);
-      const imgHtml = imgs.length
-        ? (imgs.length === 1 ? renderImagesBlock(imgs, 'cover') : renderImagesBlock(imgs, 'scroll'))
+      const mediaHtml = imgs.length
+        ? '<div class="entry-card-media' + (imgs.length === 1 ? ' entry-card-media--single' : '') + '">' +
+          (imgs.length === 1 ? renderImagesBlock(imgs, 'single') : renderImagesBlock(imgs, 'scroll')) +
+          '</div>'
         : '';
       return (
         '<div class="entry-swipe" data-entry-id="' + e.id + '">' +
         '<div class="entry-swipe-track">' +
         '<div class="entry-swipe-main">' +
-        '<div class="entry-card">' + imgHtml +
+        '<div class="entry-card">' +
         '<div class="entry-card-body">' +
         '<div class="entry-card-row">' +
         '<span class="entry-mood-ico">' + moodIco(e.mood, 24, false) + '</span>' +
@@ -153,11 +185,12 @@
         '<div class="entry-card-meta">' +
         '<span class="entry-date">' + esc(e.date) + '</span>' +
         '<span class="entry-meta-dot">·</span>' +
-        '<span class="entry-sub">' + esc(e.time) + ' · ' + m.label + '</span>' +
+        '<span class="entry-sub">' + esc(API.displayTime24(e.time)) + ' · ' + m.label + '</span>' +
         '</div>' +
         '<p class="entry-content">' + esc(e.content) + '</p>' +
-        '</div></div></div></div>' +
-        '</div>' +
+        '</div></div></div>' +
+        mediaHtml +
+        '</div></div>' +
         '<div class="entry-swipe-actions">' +
         '<button type="button" class="swipe-btn swipe-edit" data-edit="' + e.id + '" aria-label="编辑">' +
         ico('pencil', 20) + '<span class="swipe-label">编辑</span></button>' +

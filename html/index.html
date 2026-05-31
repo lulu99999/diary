@@ -51,7 +51,11 @@
     <span class="header-title" id="header-title">拾光</span>
     <button type="button" class="icon-round" id="btn-dark" aria-label="深色模式"></button>
   </header>
+  <div id="diary-float-bar" class="diary-float-bar hidden" aria-hidden="true">
+    <div id="diary-float-inner" class="diary-float-inner"></div>
+  </div>
   <main class="main-scroll" id="main-content"></main>
+  <button type="button" id="btn-scroll-top" class="btn-scroll-top-fab hidden" aria-label="回到顶部"></button>
   <nav class="bottom-nav safe-bottom hidden" id="bottom-nav">
     <button type="button" class="nav-btn nav-btn-labeled" data-nav="diary" id="nav-diary" aria-label="日记"></button>
     <button type="button" class="btn-fab" id="btn-plus" aria-label="写日记"></button>
@@ -86,7 +90,7 @@
       <button type="button" class="sidebar-btn primary" id="btn-save-pass">保存并开启</button>
     </div>
     <p class="sidebar-section">数据管理</p>
-    <p class="sidebar-hint">数据按本设备保存，升级功能后旧日记会自动保留。建议偶尔「导出备份」。</p>
+    <p class="sidebar-hint">仅支持本地保存，更换设备请先[导出备份]，再到新设备导入</p>
     <p class="sidebar-hint" id="device-id-hint" style="font-size:0.6rem;word-break:break-all"></p>
     <button type="button" class="sidebar-btn sidebar-btn-with-icon" id="btn-export"></button>
     <button type="button" class="sidebar-btn sidebar-btn-with-icon" id="btn-import"></button>

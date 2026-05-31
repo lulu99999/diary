@@ -12,8 +12,8 @@
   let state = {
     entries: [],
     settings: {},
-    view: 'calendar',
-    lastDiaryView: 'calendar',
+    view: 'list',
+    lastDiaryView: 'list',
     year: now.getFullYear(),
     month: now.getMonth(),
     activeDay: now.getDate(),
@@ -211,16 +211,91 @@
     const month = monthEntries();
 
     if (state.view === 'calendar') {
+      setupDiaryFloatBar(state);
       main.innerHTML = UI.renderDateNav(state) + UI.renderCalendar(state, month, API);
     } else if (state.view === 'list') {
-      main.innerHTML = UI.renderDateNav(state) + UI.renderList(month, API);
+      setupDiaryFloatBar(state);
+      main.innerHTML = UI.renderDateNav(state) + UI.renderList(state.entries, API);
     } else if (state.view === 'write') {
+      hideDiaryFloatBar();
       main.innerHTML = UI.renderWrite(state, API);
       bindWrite();
     } else if (state.view === 'mood_stats') {
+      hideDiaryFloatBar();
       main.innerHTML = UI.renderStats(statsEntries(), state, API);
     }
     bindMainEvents();
+  }
+
+  const DIARY_PIN_THRESHOLD = 56;
+
+  function hideDiaryFloatBar() {
+    const bar = $('diary-float-bar');
+    const fab = $('btn-scroll-top');
+    const app = $('app');
+    if (bar) {
+      bar.classList.add('hidden');
+      bar.classList.remove('is-pinned');
+      bar.setAttribute('aria-hidden', 'true');
+    }
+    if (fab) {
+      fab.classList.add('hidden');
+      fab.classList.remove('is-visible');
+    }
+    if (app) app.classList.remove('diary-float-pinned');
+  }
+
+  function setupDiaryFloatBar(state) {
+    const bar = $('diary-float-bar');
+    const inner = $('diary-float-inner');
+    const fab = $('btn-scroll-top');
+    if (!bar || !inner) return;
+    bar.classList.remove('hidden', 'is-pinned');
+    bar.setAttribute('aria-hidden', 'false');
+    inner.innerHTML = UI.renderDateNav(state, { floating: true });
+    bindDiaryFloatEvents();
+    if (fab) {
+      fab.classList.remove('hidden', 'is-visible');
+    }
+    const app = $('app');
+    if (app) app.classList.remove('diary-float-pinned');
+  }
+
+  function updateDiaryFloatChrome(main) {
+    if (!main || (state.view !== 'list' && state.view !== 'calendar')) return;
+    const pinned = main.scrollTop > DIARY_PIN_THRESHOLD;
+    const bar = $('diary-float-bar');
+    const fab = $('btn-scroll-top');
+    const app = $('app');
+    if (bar) bar.classList.toggle('is-pinned', pinned);
+    if (app) app.classList.toggle('diary-float-pinned', pinned);
+    if (fab) fab.classList.toggle('is-visible', pinned && state.view === 'list');
+    const inlineNav = main.querySelector(':scope > .date-nav--inline');
+    if (inlineNav) inlineNav.classList.toggle('date-nav--concealed', pinned);
+  }
+
+  function bindDiaryFloatEvents() {
+    const inner = $('diary-float-inner');
+    if (!inner) return;
+    inner.querySelectorAll('[data-action]').forEach((el) => {
+      el.onclick = () => handleAction(el.dataset.action);
+    });
+    inner.querySelectorAll('[data-view]').forEach((el) => {
+      el.onclick = () => setView(el.dataset.view);
+    });
+  }
+
+  function diaryScrollOffset(main) {
+    main = main || $('main-content');
+    const bar = $('diary-float-bar');
+    if (bar && bar.classList.contains('is-pinned')) {
+      return bar.offsetHeight + 4;
+    }
+    const header = document.querySelector('#app .header');
+    const inlineNav = main && main.querySelector('.date-nav');
+    let h = header ? header.offsetHeight : 56;
+    if (inlineNav) h += inlineNav.offsetHeight + 8;
+    return h;
   }
 
   function bindMainEvents() {
@@ -255,6 +330,15 @@
     });
     bindViewableImages(main);
     bindEntrySwipe(main);
+    bindDiaryScrollChrome(main);
+    if (state.view === 'list') {
+      requestAnimationFrame(() => {
+        updateDiaryFloatChrome(main);
+        syncListMonthFromScroll(main);
+      });
+    } else if (state.view === 'calendar') {
+      requestAnimationFrame(() => updateDiaryFloatChrome(main));
+    }
   }
 
   function openEntrySwipe(wrap) {
@@ -383,7 +467,7 @@
         openImageViewer(list, idx);
       };
     });
-    root.querySelectorAll('.entry-card > img.cover').forEach((img) => {
+    root.querySelectorAll('.entry-card-single-img img, .entry-card > img.cover').forEach((img) => {
       img.onclick = (ev) => {
         ev.stopPropagation();
         openImageViewer([img.src], 0);
@@ -428,6 +512,7 @@
     switch (action) {
       case 'month-prev': changeMonth(-1); break;
       case 'month-next': changeMonth(1); break;
+      case 'scroll-top': scrollDiaryToTop(); break;
       case 'stats-prev': statsStep(-1); break;
       case 'stats-next': statsStep(1); break;
       case 'stats-period-month': setStatsPeriod('month'); break;
@@ -441,7 +526,7 @@
       case 'picker-open-year': openYearPicker(true); break;
       case 'open-photo-sheet': openPhotoSheet(); break;
       case 'close-photo-sheet': closePhotoSheet(); break;
-      case 'cancel-write': setView('calendar'); break;
+      case 'cancel-write': setView(state.lastDiaryView || 'list'); break;
       case 'save-diary': saveDiary(); break;
       case 'pick-camera': closePhotoSheet(); openCameraPicker(); break;
       case 'pick-album': closePhotoSheet(); openAlbumPicker(); break;
@@ -531,6 +616,9 @@
         clampActiveDay();
         closeYearPicker();
         render();
+        if (state.view === 'list') {
+          requestAnimationFrame(() => scrollListToMonth(state.year, state.month));
+        }
       };
     });
     root.querySelector('[data-action="close-year-picker"]').onclick = closeYearPicker;
@@ -563,6 +651,85 @@
     $('photo-sheet').classList.add('hidden');
   }
 
+  let listScrollTicking = false;
+  let suppressListScrollSpy = false;
+
+  function monthSectionKey(year, month) {
+    return year + '-' + API.pad(month + 1);
+  }
+
+  function parseMonthSectionKey(key) {
+    const parts = String(key).split('-').map(Number);
+    return { year: parts[0], month: parts[1] - 1 };
+  }
+
+  function updateMonthNavLabel() {
+    const btn = document.querySelector('#diary-float-inner .month-year-btn') ||
+      document.querySelector('#main-content .month-year-btn');
+    if (btn) btn.textContent = state.year + '年' + (state.month + 1) + '月';
+  }
+
+  function syncListMonthFromScroll(main) {
+    if (suppressListScrollSpy || state.view !== 'list' || !main) return;
+    const sections = main.querySelectorAll('.list-month-section');
+    if (!sections.length) return;
+    const probe = diaryScrollOffset(main) + 8;
+    const scrollTop = main.scrollTop + probe;
+    let active = sections[0];
+    sections.forEach((sec) => {
+      if (sec.offsetTop <= scrollTop) active = sec;
+    });
+    const key = active.dataset.monthKey;
+    if (!key) return;
+    const p = parseMonthSectionKey(key);
+    if (p.year === state.year && p.month === state.month) return;
+    state.year = p.year;
+    state.month = p.month;
+    clampActiveDay();
+    updateMonthNavLabel();
+  }
+
+  function bindDiaryScrollChrome(main) {
+    if (!main || main._diaryScrollChrome) return;
+    main._diaryScrollChrome = true;
+    main.addEventListener('scroll', () => {
+      if (state.view !== 'list' && state.view !== 'calendar') return;
+      if (listScrollTicking) return;
+      listScrollTicking = true;
+      requestAnimationFrame(() => {
+        updateDiaryFloatChrome(main);
+        if (state.view === 'list') syncListMonthFromScroll(main);
+        listScrollTicking = false;
+      });
+    }, { passive: true });
+  }
+
+  function scrollDiaryToTop() {
+    const main = $('main-content');
+    if (!main) return;
+    suppressListScrollSpy = true;
+    main.scrollTo({ top: 0, behavior: 'smooth' });
+    window.setTimeout(() => {
+      suppressListScrollSpy = false;
+      updateDiaryFloatChrome(main);
+    }, 480);
+  }
+
+  function scrollListToMonth(year, month) {
+    const main = $('main-content');
+    if (!main) return;
+    const key = monthSectionKey(year, month);
+    const section = main.querySelector('.list-month-section[data-month-key="' + key + '"]');
+    if (!section) {
+      toast('该月暂无日记', true);
+      return;
+    }
+    const offset = diaryScrollOffset(main);
+    suppressListScrollSpy = true;
+    main.scrollTo({ top: Math.max(0, section.offsetTop - offset), behavior: 'smooth' });
+    window.setTimeout(() => { suppressListScrollSpy = false; }, 480);
+  }
+
   function changeMonth(d) {
     let m = state.month + d;
     let y = state.year;
@@ -571,6 +738,15 @@
     state.month = m;
     state.year = y;
     clampActiveDay();
+    if (state.view === 'list') {
+      updateMonthNavLabel();
+      scrollListToMonth(y, m);
+      return;
+    }
+    if (state.view === 'calendar') {
+      render();
+      return;
+    }
     render();
   }
 
@@ -631,7 +807,7 @@
     if (!iv.ok) { toast(iv.msg, true); return; }
 
     const dateStr = API.dateKey(state.year, state.month, state.activeDay);
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = API.formatTime24(new Date());
 
     if (state.editingId) {
       const old = findEntry(state.editingId);
@@ -911,12 +1087,15 @@
     icons.set($('image-viewer-close'), 'x', 20);
     icons.set($('image-viewer-prev'), 'chevronLeft', 22);
     icons.set($('image-viewer-next'), 'chevronRight', 22);
+    icons.set($('btn-scroll-top'), 'chevronUp', 22);
   }
 
   function bindGlobal() {
     initStaticIcons();
     bindPhotoInputs();
     bindImageViewer();
+    const scrollTopBtn = $('btn-scroll-top');
+    if (scrollTopBtn) scrollTopBtn.onclick = () => handleAction('scroll-top');
     $('btn-menu').onclick = openSidebar;
     $('btn-sidebar-close').onclick = closeSidebar;
     $('btn-dark').onclick = toggleDark;
@@ -924,7 +1103,7 @@
     $('btn-plus').onclick = startWrite;
     document.querySelectorAll('.nav-btn').forEach((btn) => {
       btn.onclick = () => {
-        if (btn.dataset.nav === 'diary') setView(state.lastDiaryView || 'calendar');
+        if (btn.dataset.nav === 'diary') setView(state.lastDiaryView || 'list');
         else setView(btn.dataset.view);
       };
     });

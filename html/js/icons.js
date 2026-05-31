@@ -17,6 +17,7 @@
     chevronLeft: '<path d="m15 18-6-6 6-6"/>',
     chevronRight: '<path d="m9 18 6-6-6-6"/>',
     chevronDown: '<path d="m6 9 6 6 6-6"/>',
+    chevronUp: '<path d="m18 15-6-6-6 6"/>',
     pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
     trash: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/>',
     camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"/><circle cx="12" cy="13" r="3"/>',

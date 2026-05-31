@@ -16,6 +16,60 @@
     return year + '-' + pad(month + 1) + '-' + pad(day);
   }
 
+  /** 24 小时制 HH:mm */
+  function formatTime24(date) {
+    const d = date instanceof Date ? date : new Date();
+    return pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  /** 展示用：把历史 12 小时制等格式统一为 HH:mm */
+  function displayTime24(timeStr) {
+    if (timeStr == null || timeStr === '') return '12:00';
+    const s = String(timeStr).trim();
+
+    let m = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)$/i);
+    if (m) {
+      let h = parseInt(m[1], 10);
+      const min = m[2];
+      const pm = m[3].toUpperCase() === 'PM';
+      if (h === 12) h = pm ? 12 : 0;
+      else if (pm) h += 12;
+      return pad(h) + ':' + min;
+    }
+
+    if (/下午|晚上/.test(s)) {
+      m = s.match(/(\d{1,2}):(\d{2})/);
+      if (m) {
+        let h = parseInt(m[1], 10);
+        const min = m[2];
+        if (h < 12) h += 12;
+        return pad(h) + ':' + min;
+      }
+    }
+    if (/中午/.test(s)) {
+      m = s.match(/(\d{1,2}):(\d{2})/);
+      if (m) return '12:' + m[2];
+    }
+    if (/上午|凌晨|早上|清晨/.test(s)) {
+      m = s.match(/(\d{1,2}):(\d{2})/);
+      if (m) {
+        let h = parseInt(m[1], 10);
+        const min = m[2];
+        if (h === 12) h = 0;
+        return pad(h) + ':' + min;
+      }
+    }
+
+    m = s.match(/^(\d{1,2}):(\d{2})/);
+    if (m) {
+      const h = parseInt(m[1], 10);
+      const min = m[2];
+      if (h >= 0 && h <= 23) return pad(h) + ':' + min;
+    }
+
+    return s;
+  }
+
   /** 统一条目格式，兼容旧版单图 */
   function normalizeEntry(e) {
     const entry = { ...e };
@@ -216,6 +270,8 @@
     pad,
     parseDate,
     dateKey,
+    formatTime24,
+    displayTime24,
     normalizeEntry,
     getImages,
     filterByMonth,

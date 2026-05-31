@@ -381,6 +381,98 @@ body {
   align-items: center; justify-content: space-between;
   gap: 8px; margin: 12px 0 16px;
 }
+/* 内嵌月份栏：下滑盖住顶栏时隐藏，回顶再显示 */
+.date-nav--inline.date-nav--concealed {
+  visibility: hidden;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+}
+/* 日记列表/日历：下滑后月份栏全宽盖住顶栏（含设置/深浅色） */
+.diary-float-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s;
+  padding-top: max(10px, env(safe-area-inset-top));
+  padding-left: 12px;
+  padding-right: 12px;
+  padding-bottom: 10px;
+  background: color-mix(in srgb, var(--card) 96%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--text) 8%, transparent);
+}
+.diary-float-bar.is-pinned {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.diary-float-inner {
+  width: 100%;
+}
+.diary-float-inner .date-nav {
+  margin: 0;
+  padding: 0;
+  gap: 8px;
+  flex-wrap: nowrap;
+  justify-content: space-between;
+}
+.diary-float-inner .date-nav--float {
+  width: 100%;
+}
+.diary-float-inner .date-nav-group.month-nav {
+  flex: 1;
+  max-width: none;
+  justify-content: center;
+}
+#app.diary-float-pinned .header {
+  opacity: 0;
+  pointer-events: none;
+}
+.btn-scroll-top-fab {
+  position: absolute;
+  right: 18px;
+  bottom: calc(80px + max(8px, env(safe-area-inset-bottom)));
+  z-index: 55;
+  width: 44px;
+  height: 44px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: scale(0.88);
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--text) 12%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.btn-scroll-top-fab.is-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: scale(1);
+}
+.btn-scroll-top-fab:active { transform: scale(0.92); }
+.btn-scroll-top-fab .ico { color: var(--primary); }
 .date-nav-group {
   display: flex; align-items: center; gap: 4px;
   padding: 4px 8px; border-radius: var(--radius-sm);
@@ -547,10 +639,13 @@ body {
   background: var(--card);
   overflow: hidden;
   margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
 }
 .entry-card img.cover { width: 100%; height: 150px; object-fit: cover; display: block; }
 .entry-card-body {
-  padding: 16px 18px 18px;
+  padding: 16px 18px;
+  flex: 1;
   cursor: pointer;
   transition: background 0.2s ease;
   -webkit-tap-highlight-color: transparent;
@@ -767,6 +862,51 @@ body {
   font-size: 0.65rem; font-weight: 600; cursor: pointer;
 }
 .photo-add-btn .plus { font-size: 1.6rem; font-weight: 300; line-height: 1; color: var(--primary); }
+.entry-card-media {
+  background: transparent;
+  border-top: none;
+}
+.entry-card-media--single {
+  padding: 0 14px 14px;
+}
+.entry-card-media:not(.entry-card-media--single) {
+  padding: 4px 14px 14px;
+}
+.entry-card-body:has(+ .entry-card-media) {
+  padding-bottom: 12px;
+}
+.list-feed { display: flex; flex-direction: column; gap: 4px; }
+.list-month-section { margin-bottom: 8px; }
+.list-month-label {
+  margin: 0 0 10px;
+  padding: 10px 2px 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.list-month-section:first-child .list-month-label { padding-top: 2px; }
+.list-month-entries { display: flex; flex-direction: column; gap: 12px; }
+.entry-card-single-img {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--input) 50%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+}
+.entry-card-single-img img {
+  width: 100%;
+  max-height: 220px;
+  display: block;
+  object-fit: cover;
+  vertical-align: top;
+  cursor: pointer;
+}
+.entry-card-media .entry-img-gallery {
+  position: relative;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
 .entry-img-gallery {
   position: relative;
   padding: 12px;
@@ -900,7 +1040,9 @@ body {
 }
 .entry-img-thumb { cursor: pointer; }
 .entry-img-thumb:active { opacity: 0.92; }
-.entry-card img.cover { cursor: pointer; }
+.entry-card img.cover,
+.entry-card-single-img img { cursor: pointer; }
+.entry-card-single-img img:active { opacity: 0.92; }
 .entry-mini-thumbs img { cursor: pointer; }
 .photo-thumb img { cursor: pointer; }
 
